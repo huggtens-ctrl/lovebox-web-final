@@ -13,7 +13,6 @@ const removeAccents = (str) => {
   }
 };
 
-// 💡 VŨ KHÍ 1: BỘ CHỌN GIỜ ĐỘC QUYỀN
 const hoursList = Array.from({length: 24}, (_, i) => String(i).padStart(2, '0'));
 const minutesList = Array.from({length: 60}, (_, i) => String(i).padStart(2, '0'));
 
@@ -33,7 +32,6 @@ const CustomTimePicker = ({ value, onChange, colorClass = "focus:ring-[#52B788]"
   );
 };
 
-// 💡 VŨ KHÍ 2: BỘ CHỌN NGÀY & GIỜ ĐỘC QUYỀN
 const CustomDateTimePicker = ({ value, onChange, colorClass = "focus:ring-[#5D4037]" }) => {
   const safeValue = value ? value.replace(' ', 'T') : ''; 
   const datePart = safeValue ? safeValue.split('T')[0] : '';
@@ -57,7 +55,6 @@ const CustomDateTimePicker = ({ value, onChange, colorClass = "focus:ring-[#5D40
   );
 };
 
-// 🔥 FIX 1: Nạp cổng onSuccess để tránh F5
 export default function RoomModal({ isOpen, room, onClose, onSuccess }) {
   const [view, setView] = useState("menu"); 
   const [loading, setLoading] = useState(false);
@@ -94,6 +91,21 @@ export default function RoomModal({ isOpen, room, onClose, onSuccess }) {
   const isActive = room?.status === "ĐANG THUÊ";
   const order = room?.activeOrder;
 
+  // 🔥 TẦNG BẢO VỆ 4: TỰ ĐỘNG HỦY TAB NẾU TREO QUÁ 30 PHÚT
+  useEffect(() => {
+    if (isOpen) {
+      const openTime = Date.now();
+      const antiZombieTimer = setInterval(() => {
+        // Tự động tải lại trang nếu bảng này mở liên tục > 30 phút mà không có hành động gì
+        if (Date.now() - openTime > 30 * 60000) { 
+          alert("⏳ Trang đã để treo quá lâu do máy tính ngủ đông. Hệ thống tự động tải lại để dọn dẹp dữ liệu rác, đảm bảo tính tiền chính xác!");
+          window.location.reload();
+        }
+      }, 60000); // Check 1 phút / lần
+      return () => clearInterval(antiZombieTimer);
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     if (isOpen && isActive && order) {
       supabase.from('order_items').select('*').eq('order_id', order.id).then(({data}) => setCurrentOrderItems(data || []));
@@ -111,7 +123,6 @@ export default function RoomModal({ isOpen, room, onClose, onSuccess }) {
 
   if (!isOpen || !room) return null;
 
-  // 🔥 THỰC THI FIX 1: Dùng gọi ngầm thay vì tải lại toàn trang web
   const reloadApp = () => { 
     if (onSuccess) { onSuccess(); } 
     else { onClose(); window.location.reload(); }
@@ -145,7 +156,6 @@ export default function RoomModal({ isOpen, room, onClose, onSuccess }) {
 
   const handleOpenCheckin = async () => {
     if (isActive) return alert("Phòng đang có khách!");
-    // 🔥 FIX: Chặn đứng hành vi nhận khách khi phòng chưa dọn!
     if (room?.status === "DỌN PHÒNG") return alert("🛑 TỪ CHỐI NHẬN KHÁCH:\nPhòng này chưa được dọn dẹp!\n\nVui lòng báo nhân viên dọn phòng, sau đó bấm nút [🧹 Dọn/Trống] để chuyển trạng thái về TRỐNG trước khi đón khách mới.");
     
     setLoading(true); setView("checkin");
@@ -210,42 +220,84 @@ export default function RoomModal({ isOpen, room, onClose, onSuccess }) {
     setLoading(false);
   };
 
+  // 🛡️ TẦNG BẢO VỆ 1: CHỐT NHẬN PHÒNG (Diệt trừ đẻ hóa đơn ảo khi bấm đúp)
   const handleCheckinSubmit = async () => {
     if (!selectedCombo) return alert("Vui lòng chọn Combo!");
     if (loading) return; 
     setLoading(true);
+    
     try {
-      const [hh, mm] = checkinTime.split(":"); const checkinDate = new Date(); checkinDate.setHours(parseInt(hh), parseInt(mm), 0, 0);
-      const checkoutDate = new Date(checkinDate.getTime()); checkoutDate.setHours(checkoutDate.getHours() + selectedCombo.hours); checkoutDate.setMinutes(checkoutDate.getMinutes() + selectedCombo.minutes);
-      const offset = checkinDate.getTimezoneOffset() * 60000;
-      const localCheckin = (new Date(checkinDate - offset)).toISOString().slice(0, 19).replace('T', ' ');
-      const localCheckout = (new Date(checkoutDate - offset)).toISOString().slice(0, 19).replace('T', ' ');
+      const chotTask = async () => {
+        // HỎI TRƯỚC KHI LÀM: Phòng này có đang trống thật không?
+        const { data: roomCheck } = await supabase.from('rooms').select('status').eq('id', room.id).single();
+        if (roomCheck?.status !== 'TRỐNG') throw new Error("ROOM_NOT_EMPTY"); 
 
-      const finalCustomerName = phone.trim() ? `${customerName.trim()} - ${phone.trim()}` : (customerName.trim() || "Khách lẻ");
+        const [hh, mm] = checkinTime.split(":"); const checkinDate = new Date(); checkinDate.setHours(parseInt(hh), parseInt(mm), 0, 0);
+        const checkoutDate = new Date(checkinDate.getTime()); checkoutDate.setHours(checkoutDate.getHours() + selectedCombo.hours); checkoutDate.setMinutes(checkoutDate.getMinutes() + selectedCombo.minutes);
+        const offset = checkinDate.getTimezoneOffset() * 60000;
+        const localCheckin = (new Date(checkinDate - offset)).toISOString().slice(0, 19).replace('T', ' ');
+        const localCheckout = (new Date(checkoutDate - offset)).toISOString().slice(0, 19).replace('T', ' ');
+        const finalCustomerName = phone.trim() ? `${customerName.trim()} - ${phone.trim()}` : (customerName.trim() || "Khách lẻ");
 
-      await supabase.from('orders').insert([{
-        room_id: room.id, customer_name: finalCustomerName, checkin_time: localCheckin, expected_checkout_time: localCheckout,
-        combo_id: selectedCombo.id, combo_name: selectedCombo.name, combo_hours: selectedCombo.hours, combo_minutes: selectedCombo.minutes,
-        combo_price: selectedCombo.price, extra_minutes: 0, extra_money: 0, adjustment_money: 0, adjustment_reason: '',
-        room_money: selectedCombo.price, status: 'ĐANG THUÊ', branch_id: room.branch_id, created_at: new Date().toISOString(),
-        note: checkinNote 
-      }]);
-      await supabase.from('rooms').update({ status: 'ĐANG THUÊ' }).eq('id', room.id);
+        const { error } = await supabase.from('orders').insert([{
+          room_id: room.id, customer_name: finalCustomerName, checkin_time: localCheckin, expected_checkout_time: localCheckout,
+          combo_id: selectedCombo.id, combo_name: selectedCombo.name, combo_hours: selectedCombo.hours, combo_minutes: selectedCombo.minutes,
+          combo_price: selectedCombo.price, extra_minutes: 0, extra_money: 0, adjustment_money: 0, adjustment_reason: '',
+          room_money: selectedCombo.price, status: 'ĐANG THUÊ', branch_id: room.branch_id, created_at: new Date().toISOString(),
+          note: checkinNote 
+        }]);
+        if (error) throw error;
+        await supabase.from('rooms').update({ status: 'ĐANG THUÊ' }).eq('id', room.id);
+      };
+
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), 15000));
+      await Promise.race([chotTask(), timeout]);
+      
       reloadApp();
-    } catch (e) { alert("Lỗi: " + e.message); setLoading(false); }
+    } catch (e) { 
+      if (e.message === "TIMEOUT") {
+        alert("⚠️ MẠNG LAG hoặc MÁY TREO! Đã hủy lệnh để tránh sinh hóa đơn lỗi. Trang sẽ tự tải lại!"); window.location.reload();
+      } else if (e.message === "ROOM_NOT_EMPTY") {
+        alert("❌ ĐÃ CHẶN 1 BILL ẢO: Phòng này không trống, không thể tạo bill đúp!"); window.location.reload();
+      } else {
+        alert("Lỗi: " + e.message); setLoading(false);
+      }
+    }
   };
 
+  // 🛡️ TẦNG BẢO VỆ 2: THÊM DỊCH VỤ
   const handleServiceSubmit = async () => {
     if (!selectedService || quantity <= 0) return alert("Dữ liệu không hợp lệ!");
     if (loading) return; 
     setLoading(true);
+
     try {
-      await supabase.from('order_items').insert([{ order_id: order.id, service_name: selectedService.name, quantity: quantity, price: selectedService.price, total: selectedService.price * quantity, created_at: new Date().toISOString() }]);
-      const { data: srvData } = await supabase.from('order_items').select('total').eq('order_id', order.id);
-      const newServiceMoney = srvData ? srvData.reduce((sum, item) => sum + item.total, 0) : 0;
-      await supabase.from('orders').update({ service_money: newServiceMoney }).eq('id', order.id);
+      const chotTask = async () => {
+        // HỎI TRƯỚC KHI LÀM: Khách này đã tính tiền chưa?
+        const { data: orderCheck } = await supabase.from('orders').select('status').eq('id', order.id).single();
+        if (!orderCheck || orderCheck.status === 'ĐÃ THANH TOÁN') throw new Error("ALREADY_PAID");
+
+        const { error: err1 } = await supabase.from('order_items').insert([{ order_id: order.id, service_name: selectedService.name, quantity: quantity, price: selectedService.price, total: selectedService.price * quantity, created_at: new Date().toISOString() }]);
+        if (err1) throw err1;
+
+        const { data: srvData } = await supabase.from('order_items').select('total').eq('order_id', order.id);
+        const newServiceMoney = srvData ? srvData.reduce((sum, item) => sum + item.total, 0) : 0;
+        await supabase.from('orders').update({ service_money: newServiceMoney }).eq('id', order.id);
+      };
+
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), 15000));
+      await Promise.race([chotTask(), timeout]);
+
       reloadApp(); 
-    } catch (e) { alert("Lỗi: " + e.message); setLoading(false); }
+    } catch (e) { 
+      if (e.message === "TIMEOUT") {
+        alert("⚠️ MẠNG LAG! Lệnh thêm món bị quá giờ. Hãy tải lại trang!"); window.location.reload();
+      } else if (e.message === "ALREADY_PAID") {
+        alert("❌ LỖI: Không thể thêm đồ vì Hóa đơn này đã được tính tiền xong xuôi!"); window.location.reload();
+      } else {
+        alert("Lỗi: " + e.message); setLoading(false);
+      }
+    }
   };
 
   const handleOpenCheckout = async () => {
@@ -263,30 +315,49 @@ export default function RoomModal({ isOpen, room, onClose, onSuccess }) {
     setLoading(false);
   };
 
-  // 🔥 THỰC THI FIX 2: Bọc thép lệnh thanh toán, chống kẹt trạng thái null trên DB
+  // 🛡️ TẦNG BẢO VỆ 3: CHỐT THANH TOÁN (Khắc tinh của Zombie Tab ngày 19)
   const handleCheckoutSubmit = async () => {
     const cash = parseInt(cashAmount || 0); const transfer = parseInt(transferAmount || 0);
     if (cash + transfer !== checkoutData.total) return alert(`Tiền mặt + CK phải khớp Tổng Bill: ${money(checkoutData.total)}`);
     if (loading) return; 
     setLoading(true);
+
     try {
-      let pm = "CẢ HAI"; if (cash === checkoutData.total) pm = "TIỀN MẶT"; if (transfer === checkoutData.total) pm = "CHUYỂN KHOẢN";
-      const expDate = new Date(order.expected_checkout_time); const [hh, mm] = checkoutTime.split(":"); expDate.setHours(parseInt(hh), parseInt(mm), 0, 0);
-      const finalCheckoutStr = (new Date(expDate - expDate.getTimezoneOffset() * 60000)).toISOString().slice(0, 19).replace('T', ' ');
+      const chotTask = async () => {
+        // HỎI TRƯỚC KHI LÀM: Hóa đơn này đã thu tiền trước đó chưa?
+        const { data: orderCheck } = await supabase.from('orders').select('status').eq('id', order.id).single();
+        if (!orderCheck || orderCheck.status === 'ĐÃ THANH TOÁN') throw new Error("ALREADY_PAID"); 
 
-      // Ép nhận biên lai (.select()) mới được làm tiếp
-      const { error: err1 } = await supabase.from('orders').update({
-        checkout_time: finalCheckoutStr, paid_at: finalCheckoutStr, room_money: checkoutData.roomMoney, service_money: checkoutData.serviceMoney,
-        adjustment_money: checkoutData.adjustMoney, discount: checkoutData.discount, total_money: checkoutData.total, payment_method: pm, cash_amount: cash, transfer_amount: transfer, status: 'ĐÃ THANH TOÁN',
-        note: checkinNote
-      }).eq('id', order.id).select();
-      if (err1) throw err1;
+        let pm = "CẢ HAI"; if (cash === checkoutData.total) pm = "TIỀN MẶT"; if (transfer === checkoutData.total) pm = "CHUYỂN KHOẢN";
+        const expDate = new Date(order.expected_checkout_time); const [hh, mm] = checkoutTime.split(":"); expDate.setHours(parseInt(hh), parseInt(mm), 0, 0);
+        const finalCheckoutStr = (new Date(expDate - expDate.getTimezoneOffset() * 60000)).toISOString().slice(0, 19).replace('T', ' ');
 
-      const { error: err2 } = await supabase.from('rooms').update({ status: 'DỌN PHÒNG' }).eq('id', room.id).select();
-      if (err2) throw err2;
+        const { error: err1 } = await supabase.from('orders').update({
+          checkout_time: finalCheckoutStr, paid_at: finalCheckoutStr, room_money: checkoutData.roomMoney, service_money: checkoutData.serviceMoney,
+          adjustment_money: checkoutData.adjustMoney, discount: checkoutData.discount, total_money: checkoutData.total, payment_method: pm, cash_amount: cash, transfer_amount: transfer, status: 'ĐÃ THANH TOÁN',
+          note: checkinNote
+        }).eq('id', order.id);
+        if (err1) throw err1;
 
+        await supabase.from('rooms').update({ status: 'DỌN PHÒNG' }).eq('id', room.id);
+      };
+
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), 15000));
+      await Promise.race([chotTask(), timeout]);
+
+      alert("✅ Đã thanh toán và trả phòng thành công!");
       reloadApp();
-    } catch (e) { alert("Lỗi Thanh Toán: " + e.message); setLoading(false); }
+    } catch (e) { 
+      if (e.message === "TIMEOUT") {
+        alert("⚠️ MẠNG TREO! Hệ thống tự động HỦY ngang lệnh thanh toán này. Tải lại trang...");
+        window.location.reload();
+      } else if (e.message === "ALREADY_PAID") {
+        alert("❌ ĐÃ CHẶN 1 DOANH THU ẢO: Hệ thống phát hiện bill này đã được thu tiền trước đó rồi, tuyệt đối không tính đúp!");
+        window.location.reload();
+      } else {
+        alert("Lỗi Thanh Toán: " + e.message); setLoading(false); 
+      }
+    }
   };
 
   const handleMoneyType = (type, val) => {
@@ -300,9 +371,8 @@ export default function RoomModal({ isOpen, room, onClose, onSuccess }) {
     return (order.combo_price||0) + (order.extra_money||0) + currentOrderItems.reduce((s,i)=>s+i.total,0) + (order.adjustment_money||0);
   };
 
-  // 🔥 THỰC THI FIX 3: Tấm khiên số 1 chống lỗi văng màn hình đỏ
   const InvoiceDetail = () => {
-    if (!order) return null; // Nếu Realtime xóa order, giấu luôn bảng bill này!
+    if (!order) return null; 
     
     return (
       <div className="bg-white p-3 md:p-4 rounded-xl border border-dashed border-gray-400 font-mono text-xs md:text-[15px] space-y-1 mb-4 shadow-inner text-gray-800 shrink-0">
@@ -339,7 +409,6 @@ export default function RoomModal({ isOpen, room, onClose, onSuccess }) {
 
         <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar flex-1 bg-white">
           
-          {/* 🔥 THỰC THI FIX 3: Tấm khiên số 2 chặn toàn bộ khung nhập liệu */}
           {view === "menu" && (
             <>
               {isActive && order ? (
@@ -370,7 +439,6 @@ export default function RoomModal({ isOpen, room, onClose, onSuccess }) {
               )}
 
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 md:gap-3">
-                {/* 🔥 FIX: Làm mờ nút Nhận phòng nếu trạng thái không phải là TRỐNG */}
                 <button 
                   onClick={handleOpenCheckin} 
                   className={`p-3 md:p-4 rounded-xl font-bold text-xs sm:text-sm md:text-base shadow-sm flex flex-col items-center justify-center text-center gap-1 transition-colors ${room?.status === 'TRỐNG' ? 'bg-[#2E7D32] hover:bg-[#1B5E20] text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
@@ -396,7 +464,6 @@ export default function RoomModal({ isOpen, room, onClose, onSuccess }) {
             </>
           )}
 
-          {/* 🔥 THỰC THI FIX 3: Tấm khiên số 3 chặn tất cả các bảng nhập liệu phụ */}
           {view === "adjust_price" && order && (() => {
             const roomMoney = parseInt(order.combo_price || 0) + parseInt(order.extra_money || 0);
             const serviceMoney = currentOrderItems.reduce((s,i) => s + i.total, 0);

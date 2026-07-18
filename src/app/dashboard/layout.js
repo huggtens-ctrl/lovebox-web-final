@@ -175,7 +175,7 @@ export default function DashboardLayout({ children }) {
 
         <header className="px-4 md:px-8 py-3 md:py-5 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-[#EAF7EA] border-b border-[#B7E4C7]/30 gap-2 shrink-0">
           <div>
-            <h1 className="text-lg md:text-2xl lg:text-3xl font-bold text-[#2D6A4F] tracking-tight">🏨 HỆ THỐNG LOVEBOX BILL v1.2</h1>
+            <h1 className="text-lg md:text-2xl lg:text-3xl font-bold text-[#2D6A4F] tracking-tight">🏨 HỆ THỐNG LOVEBOX BILL v1.3</h1>
             <div className="text-[#3E8E63] font-semibold mt-1 text-xs md:text-sm break-all flex flex-wrap items-center gap-2">
               
               {role === 'SUPER_ADMIN' ? (
