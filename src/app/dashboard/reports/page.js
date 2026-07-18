@@ -50,7 +50,6 @@ export default function ReportsManager() {
   const [editCashbook, setEditCashbook] = useState(null);
   const [editCbData, setEditCbData] = useState({});
 
-  // 🔥 STATE MỚI ĐỂ XEM CHI TIẾT HÓA ĐƠN
   const [viewOrder, setViewOrder] = useState(null);
   const [viewOrderItems, setViewOrderItems] = useState([]);
 
@@ -156,7 +155,6 @@ export default function ReportsManager() {
     } catch (e) { alert("Lỗi: " + e.message); }
   };
 
-  // 🔥 HÀM MỚI: HÚT DỊCH VỤ VÀ MỞ BẢNG CHI TIẾT
   const handleViewOrderDetails = async (order) => {
     setViewOrder(order);
     setLoading(true);
@@ -232,7 +230,15 @@ export default function ReportsManager() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2 md:gap-4 shrink-0">
+      {/* 🔥 CHỈNH SỬA GRID CỘT VÀ THÊM Ô "SỐ HÓA ĐƠN" Ở ĐÂY */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 md:gap-4 shrink-0">
+        
+        {/* Ô ĐẾM TỔNG SỐ HÓA ĐƠN */}
+        <div className="bg-purple-50 p-3 md:p-4 rounded-xl border border-purple-200 text-center shadow-sm flex flex-col justify-center">
+          <p className="font-bold text-purple-800 text-[10px] md:text-xs">🧾 SỐ HÓA ĐƠN</p>
+          <p className="text-base md:text-lg font-bold text-purple-600 mt-1">{filteredOrders.length} Bill</p>
+        </div>
+
         <div className="bg-[#EAF7EA] p-3 md:p-4 rounded-xl border border-[#B7E4C7] text-center shadow-sm flex flex-col justify-center">
           <p className="font-bold text-[#2D6A4F] text-[10px] md:text-xs">💵 TIỀN MẶT</p>
           <p className="text-base md:text-lg font-bold text-[#2E7D32] mt-1">{money(netCash)}</p>
@@ -253,7 +259,7 @@ export default function ReportsManager() {
           <p className="text-base md:text-lg font-bold text-rose-600 mt-1">-{money(tongChi)}</p>
         </div>
         
-        <div className="bg-[#FFF8E1] p-3 md:p-4 rounded-xl border border-yellow-200 text-center shadow-sm flex flex-col justify-center col-span-2 md:col-span-1">
+        <div className="bg-[#FFF8E1] p-3 md:p-4 rounded-xl border border-yellow-200 text-center shadow-sm flex flex-col justify-center">
           <p className="font-bold text-red-800 text-[10px] md:text-xs">💰 DOANH THU THỰC TẾ</p>
           <p className="text-base md:text-lg font-bold text-[#D32F2F] mt-1">{money(netTotal)}</p>
         </div>
@@ -325,7 +331,6 @@ export default function ReportsManager() {
                         </div>
                       </td>
 
-                      {/* 🔥 NÚT BẤM CÓ THÊM NÚT XEM CHI TIẾT */}
                       <td className="p-3 text-center">
                         <div className="flex items-center justify-center space-x-2">
                           <button onClick={() => handleViewOrderDetails(o)} className="px-2 md:px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-500 hover:text-white transition-colors rounded-lg font-bold shadow-sm text-xs md:text-sm">Xem</button>
@@ -380,7 +385,6 @@ export default function ReportsManager() {
         </div>
       </div>
 
-      {/* 🔥 MODAL XEM CHI TIẾT HÓA ĐƠN TRỰC QUAN NHƯ BIÊN LAI */}
       {viewOrder && (
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white p-4 md:p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4 transform transition-all max-h-[90vh] overflow-y-auto custom-scrollbar relative">
@@ -446,7 +450,6 @@ export default function ReportsManager() {
         </div>
       )}
 
-      {/* CÁC MODAL SỬA ĐỔI GIỮ NGUYÊN BÊN DƯỚI */}
       {editOrder && (
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white p-4 md:p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4 transform transition-all max-h-[90vh] overflow-y-auto custom-scrollbar">
